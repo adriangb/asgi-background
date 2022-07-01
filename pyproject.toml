@@ -1,0 +1,79 @@
+[tool.poetry]
+name = "asgi-background"
+version = "0.1.0"
+description = "Background tasks for any ASGI web framework"
+authors = ["Adrian Garcia Badaracco <adrian@adriangb.com>"]
+readme = "README.md"
+repository = "https://github.com/adriangb/asgi-background"
+documentation = "https://github.com/adriangb/asgi-background"
+keywords = ["web-framework", "http", "asgi"]
+license = "MIT"
+classifiers = [
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python",
+    "Topic :: Internet",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development",
+    "Typing :: Typed",
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Internet :: WWW/HTTP",
+]
+
+[tool.poetry.dependencies]
+python = ">=3.7,<4"
+anyio = "^3.6.1"
+
+[tool.poetry.dev-dependencies]
+# linting
+black = "~22"
+flake8 = "~3"
+isort = "~5"
+pre-commit = "~2"
+# testing
+pytest = "~6"
+pytest-cov = { version = "~3" }
+pytest-sugar = "~0"
+trio = "^0.19.0"
+starlette = "^0.20.4"
+requests = "^2.28.1"
+pyright = "^1.1.256"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
+[tool.coverage.run]
+branch = true
+source = ["asgi_background", "tests"]
+dynamic_context = "test_function"
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    '\.\.\.',
+    "raise NotImplementedError",
+    "TYPE_CHECKING",
+    "__repr__",
+    "import",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
