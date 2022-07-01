@@ -1,5 +1,6 @@
-import typing
 import sys
+import typing
+
 if sys.version_info < (3, 8):
     from typing_extensions import Protocol
 else:
@@ -13,5 +14,7 @@ Send = typing.Callable[[Message], typing.Awaitable[None]]
 
 
 class ASGIApp(Protocol):
-    def __call__(self, __scope: Scope, __receive: Receive, __send: Send) -> typing.Awaitable[None]:
+    def __call__(
+        self, __scope: Scope, __receive: Receive, __send: Send
+    ) -> typing.Awaitable[None]:
         ...

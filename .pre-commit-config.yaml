@@ -33,9 +33,9 @@ repos:
       language: system
       entry: poetry run flake8 asgi_background tests
       types: [python]
-    - id: pyright
-      name: pyright
+    - id: mypy
+      name: mypy
       language: system
-      entry: poetry run pyright asgi_background tests
+      entry: poetry run mypy
       types: [python]
       pass_filenames: false
