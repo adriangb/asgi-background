@@ -13,7 +13,7 @@ class BackgroundTasks:
     _tg: anyio.abc.TaskGroup
 
     def __init__(self, scope: Scope) -> None:
-        if "asgi-background" not in scope:
+        if "asgi-background" not in scope:  # pragma: no cover
             raise RuntimeError("BackgroundTaskMiddleware is not installed")
         self._tg = scope["asgi-background"]
 
