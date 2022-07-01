@@ -14,6 +14,5 @@ class BackgroundTaskMiddleware:
 
         async with anyio.create_task_group() as tg:
             state = scope["asgi-background"] = tg
-            scope["asgi-background"] = state
             async with anyio.CancelScope(shield=True):
                 await self._app(scope, receive, send)
