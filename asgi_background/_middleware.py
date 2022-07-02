@@ -1,5 +1,4 @@
-import anyio
-import anyio.abc
+from typing import Awaitable, Callable, List
 
 from asgi_background._types import ASGIApp, Receive, Scope, Send
 
@@ -12,7 +11,8 @@ class BackgroundTaskMiddleware:
         if scope["type"] != "http":  # pragma: no cover
             await self._app(scope, receive, send)
 
-        async with anyio.create_task_group() as tg:
-            scope["asgi-background"] = tg
-            async with anyio.CancelScope(shield=True):
-                await self._app(scope, receive, send)
+        tasks: "List[Callable[[], Awaitable[None]]]"
+        tasks = scope["asgi-background"] = []
+        await self._app(scope, receive, send)
+        for task in tasks:
+            await task()
