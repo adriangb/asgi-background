@@ -38,6 +38,7 @@ classifiers = [
 python = ">=3.7,<4"
 anyio = "^3.6.1"
 typing-extensions = { version = "^4.2.0", python = "<3.10"}
+asgi-lifespan-middleware = { git = "https://github.com/xpresso-devs/asgi-lifespan.git", branch = "main"}
 
 [tool.poetry.dev-dependencies]
 # linting

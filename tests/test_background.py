@@ -24,6 +24,8 @@ def test_background_tasks() -> None:
 
     def set_response_sent_middleware(app: ASGIApp) -> ASGIApp:
         async def call(scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] != "http":
+                return await app(scope, receive, send)
             resp_sent = anyio.Event()
             scope["resp-sent"] = resp_sent
             await app(scope, receive, send)
@@ -40,6 +42,8 @@ def test_background_tasks() -> None:
         # the only guarantee we make is that they won't
         # hold up the response from being sent
         async def call(scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] != "http":
+                return await app(scope, receive, send)
             done = anyio.Event()
             scope["done"] = done
             await app(scope, receive, send)
@@ -53,9 +57,10 @@ def test_background_tasks() -> None:
     app = BackgroundTaskMiddleware(app)
     app = check_done_middleware(app)
 
-    client = TestClient(app)
-    resp = client.get("/")
-    assert resp.status_code == 200
+    with TestClient(app) as client:
+        resp = client.get("/")
+        assert resp.status_code == 200
+        print("done")
 
 
 def test_error_raised_in_background() -> None:
@@ -72,15 +77,13 @@ def test_error_raised_in_background() -> None:
         tasks.add_task(tsk, start)
         return Response()
 
-    response_sent = False
-
     def event_middleware(app: ASGIApp) -> ASGIApp:
         async def call(scope: Scope, receive: Receive, send: Send) -> None:
-            nonlocal response_sent
+            if scope["type"] != "http":
+                return await app(scope, receive, send)
             start = anyio.Event()
             scope["event"] = start
             await app(scope, receive, send)
-            response_sent = True
             start.set()
 
         return call
@@ -90,8 +93,12 @@ def test_error_raised_in_background() -> None:
     app = event_middleware(app)
     app = BackgroundTaskMiddleware(app)
 
-    client = TestClient(app)
+    # the error should eb raised after the response is returned
+    called = False
     with pytest.raises(MyError):
-        client.get("/")
+        with TestClient(app) as client:
+            resp = client.get("/")
+            assert resp.status_code == 200, resp.content
+            called = True
 
-    assert response_sent
+    assert called
