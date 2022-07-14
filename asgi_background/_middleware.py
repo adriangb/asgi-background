@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from logging import getLogger
 from typing import Any, AsyncIterator, Awaitable, Callable, List, Optional
 
 import anyio
@@ -8,6 +9,9 @@ from asgi_lifespan_middleware import LifespanMiddleware
 from asgi_background._types import ASGIApp, Receive, Scope, Send
 
 Task = Callable[[], Awaitable[None]]
+
+
+logger = getLogger(__name__)
 
 
 class BackgroundTaskMiddleware:
@@ -40,7 +44,15 @@ class BackgroundTaskMiddleware:
         await self._app(scope, receive, send)
         for task in tasks:
             # start_soon requires a coroutine
+            # and we also want to log exceptions instead of crashing
             async def coro(tsk: Task = task):
-                await tsk()
+                try:
+                    await tsk()
+                except Exception:
+                    # log and swallow the exception
+                    # this is the same behavior Quart uses (explicitly)
+                    # Starlette lets it bubble up and Uvicorn catches and logs it
+                    # but also swallows it
+                    logger.exception("Exception in background task")
 
             self._tg.start_soon(coro)

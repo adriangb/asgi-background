@@ -1,5 +1,6 @@
+from typing import Any
+
 import anyio
-import pytest
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import Response
@@ -63,42 +64,28 @@ def test_background_tasks() -> None:
         print("done")
 
 
-def test_error_raised_in_background() -> None:
+def test_error_raised_in_background(caplog: Any) -> None:
     class MyError(Exception):
         pass
 
-    async def tsk(start: anyio.Event) -> None:
-        await start.wait()
+    async def tsk() -> None:
         raise MyError
 
     async def endpoint(request: Request) -> Response:
         tasks = BackgroundTasks(request.scope)
-        start: anyio.Event = request.scope["event"]
-        tasks.add_task(tsk, start)
+        tasks.add_task(tsk)
         return Response()
-
-    def event_middleware(app: ASGIApp) -> ASGIApp:
-        async def call(scope: Scope, receive: Receive, send: Send) -> None:
-            if scope["type"] != "http":
-                return await app(scope, receive, send)
-            start = anyio.Event()
-            scope["event"] = start
-            await app(scope, receive, send)
-            start.set()
-
-        return call
 
     app: ASGIApp
     app = Starlette(routes=[Route("/", endpoint)])
-    app = event_middleware(app)
     app = BackgroundTaskMiddleware(app)
 
-    # the error should eb raised after the response is returned
+    # there should be no error raised, just logged
     called = False
-    with pytest.raises(MyError):
-        with TestClient(app) as client:
-            resp = client.get("/")
-            assert resp.status_code == 200, resp.content
-            called = True
+    with TestClient(app) as client:
+        resp = client.get("/")
+        assert resp.status_code == 200, resp.content
+        called = True
 
     assert called
+    assert "Exception in background task" in caplog.messages
