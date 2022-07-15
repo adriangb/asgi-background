@@ -21,7 +21,7 @@ class BackgroundTaskMiddleware:
         self._tg = None
 
         @asynccontextmanager
-        async def lifespan(*args: Any) -> AsyncIterator[None]:
+        async def lifespan(*args: Any) -> "AsyncIterator[None]":
             if self._tg is not None:  # pragma: no cover
                 raise RuntimeError(
                     "Lifespan called twice on"
