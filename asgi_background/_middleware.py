@@ -22,6 +22,11 @@ class BackgroundTaskMiddleware:
 
         @asynccontextmanager
         async def lifespan(*args: Any) -> AsyncIterator[None]:
+            if self._tg is not None:  # pragma: no cover
+                raise RuntimeError(
+                    "Lifespan called twice on"
+                    " the same BackgroundTaskMiddleware object"
+                )
             try:
                 async with anyio.create_task_group() as tg:
                     self._tg = tg
