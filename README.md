@@ -20,7 +20,7 @@ async def task(num: int) -> None:
 
 async def endpoint(request: Request) -> Response:
     tasks = BackgroundTasks(request.scope)
-    await tasks.add_task(task, 1)
+    tasks.add_task(task, 1)
     return Response()
 
 
