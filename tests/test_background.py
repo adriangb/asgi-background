@@ -1,6 +1,8 @@
-from typing import Any
+from time import time
+from typing import Any, List, Optional, Tuple
 
 import anyio
+import pytest
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import Response
@@ -20,7 +22,7 @@ def test_background_tasks() -> None:
 
     async def endpoint(request: Request) -> Response:
         tasks = BackgroundTasks(request.scope)
-        tasks.add_task(tsk, 1, request.scope["resp-sent"], request.scope["done"])
+        await tasks.add_task(tsk, 1, request.scope["resp-sent"], request.scope["done"])
         return Response()
 
     def set_response_sent_middleware(app: ASGIApp) -> ASGIApp:
@@ -61,7 +63,44 @@ def test_background_tasks() -> None:
     with TestClient(app) as client:
         resp = client.get("/")
         assert resp.status_code == 200
-        print("done")
+
+
+@pytest.mark.parametrize(
+    "semaphore, expected_overlap",
+    [
+        (None, True),
+        (anyio.Semaphore(1), False),
+    ],
+)
+def test_background_tasks_back_pressure(
+    semaphore: Optional[anyio.Semaphore],
+    expected_overlap: bool,
+) -> None:
+    times: List[Tuple[float, float]] = []
+
+    async def tsk() -> None:
+        start = time()
+        await anyio.sleep(1)
+        stop = time()
+        times.append((start, stop))
+
+    async def endpoint(request: Request) -> Response:
+        tasks = BackgroundTasks(request.scope)
+        await tasks.add_task(tsk)
+        return Response()
+
+    app: ASGIApp
+    app = Starlette(routes=[Route("/", endpoint)])
+    app = BackgroundTaskMiddleware(app, semaphore=semaphore)
+
+    with TestClient(app) as client:
+        resp = client.get("/")
+        assert resp.status_code == 200
+        resp = client.get("/")
+        assert resp.status_code == 200
+
+    overlap = min(times[0][1], times[1][1]) - max(times[0][0], times[1][0]) > 0
+    assert overlap is expected_overlap, times
 
 
 def test_error_raised_in_background(caplog: Any) -> None:
@@ -73,7 +112,7 @@ def test_error_raised_in_background(caplog: Any) -> None:
 
     async def endpoint(request: Request) -> Response:
         tasks = BackgroundTasks(request.scope)
-        tasks.add_task(tsk)
+        await tasks.add_task(tsk)
         return Response()
 
     app: ASGIApp

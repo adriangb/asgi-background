@@ -17,8 +17,11 @@ logger = getLogger(__name__)
 class BackgroundTaskMiddleware:
     _tg: Optional[anyio.abc.TaskGroup]
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(
+        self, app: ASGIApp, semaphore: Optional[anyio.Semaphore] = None
+    ) -> None:
         self._tg = None
+        self._semaphore = semaphore
 
         @asynccontextmanager
         async def lifespan(*args: Any) -> "AsyncIterator[None]":
@@ -45,19 +48,25 @@ class BackgroundTaskMiddleware:
             raise RuntimeError("Lifespan was not called")
 
         tasks: "List[Task]"
-        tasks = scope["asgi-background"] = []
-        await self._app(scope, receive, send)
-        for task in tasks:
-            # start_soon requires a coroutine
-            # and we also want to log exceptions instead of crashing
-            async def coro(tsk: Task = task):
-                try:
-                    await tsk()
-                except Exception:
-                    # log and swallow the exception
-                    # this is the same behavior Quart uses (explicitly)
-                    # Starlette lets it bubble up and Uvicorn catches and logs it
-                    # but also swallows it
-                    logger.exception("Exception in background task")
+        tasks = scope["asgi-background.tasks"] = []
+        scope["asgi-background.semaphore"] = self._semaphore
 
-            self._tg.start_soon(coro)
+        await self._app(scope, receive, send)
+
+        # start_soon requires a coroutine
+        # and we also want to log exceptions instead of crashing
+        async def coro(tsk: Task):
+            try:
+                await tsk()
+            except Exception:
+                # log and swallow the exception
+                # this is the same behavior Quart uses (explicitly)
+                # Starlette lets it bubble up and Uvicorn catches and logs it
+                # but also swallows it
+                logger.exception("Exception in background task")
+            finally:
+                if self._semaphore:
+                    self._semaphore.release()
+
+        for task in tasks:
+            self._tg.start_soon(coro, task)
