@@ -43,7 +43,7 @@ asgi-lifespan-middleware = ">=0.1.3"
 [tool.poetry.dev-dependencies]
 # linting
 black = "*"
-flake8 = "*"
+flake8 = ">=5.0.4"
 isort = "*"
 pre-commit = "*"
 mypy = "*"
