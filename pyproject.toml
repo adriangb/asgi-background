@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "asgi-background"
-version = "0.2.1"
+version = "0.2.2"
 description = "Background tasks for any ASGI web framework"
 authors = ["Adrian Garcia Badaracco <adrian@adriangb.com>"]
 readme = "README.md"
