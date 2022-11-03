@@ -10,7 +10,7 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from asgi_background import BackgroundTaskMiddleware, BackgroundTasks
+from asgi_background import BackgroundTaskMiddleware, BackgroundTasks, WouldBlock
 
 
 def test_background_tasks() -> None:
@@ -66,14 +66,14 @@ def test_background_tasks() -> None:
 
 
 @pytest.mark.parametrize(
-    "semaphore, expected_overlap",
+    "max_workers, expected_overlap",
     [
         (None, True),
-        (anyio.Semaphore(1), False),
+        (1, False),
     ],
 )
-def test_background_tasks_back_pressure(
-    semaphore: Optional[anyio.Semaphore],
+def test_background_add_task_backpressure(
+    max_workers: Optional[int],
     expected_overlap: bool,
 ) -> None:
     times: List[Tuple[float, float]] = []
@@ -91,7 +91,7 @@ def test_background_tasks_back_pressure(
 
     app: ASGIApp
     app = Starlette(routes=[Route("/", endpoint)])
-    app = BackgroundTaskMiddleware(app, semaphore=semaphore)
+    app = BackgroundTaskMiddleware(app, max_workers=max_workers)
 
     with TestClient(app) as client:
         resp = client.get("/")
@@ -101,6 +101,56 @@ def test_background_tasks_back_pressure(
 
     overlap = min(times[0][1], times[1][1]) - max(times[0][0], times[1][0]) > 0
     assert overlap is expected_overlap, times
+
+
+def test_background_add_task_no_wait() -> None:
+
+    times: List[Tuple[float, float]] = []
+
+    async def tsk() -> None:
+        start = time()
+        await anyio.sleep(1)
+        stop = time()
+        times.append((start, stop))
+
+    async def endpoint(request: Request) -> Response:
+        tasks = BackgroundTasks(request.scope)
+        tasks.add_task_no_wait(tsk)
+        tasks.add_task_no_wait(tsk)
+        return Response()
+
+    app: ASGIApp
+    app = Starlette(routes=[Route("/", endpoint)])
+    app = BackgroundTaskMiddleware(app, max_workers=None)
+
+    with TestClient(app) as client:
+        resp = client.get("/")
+        assert resp.status_code == 200
+        resp = client.get("/")
+        assert resp.status_code == 200
+
+    overlap = min(times[0][1], times[1][1]) - max(times[0][0], times[1][0]) > 0
+    assert overlap is True, times
+
+
+def test_background_add_task_no_wait_would_block() -> None:
+    async def tsk() -> None:
+        await anyio.sleep(1)
+
+    async def endpoint(request: Request) -> Response:
+        tasks = BackgroundTasks(request.scope)
+        tasks.add_task_no_wait(tsk)
+        with pytest.raises(WouldBlock):
+            tasks.add_task_no_wait(tsk)
+        return Response()
+
+    app: ASGIApp
+    app = Starlette(routes=[Route("/", endpoint)])
+    app = BackgroundTaskMiddleware(app, max_workers=1)
+
+    with TestClient(app) as client:
+        resp = client.get("/")
+        assert resp.status_code == 200
 
 
 def test_error_raised_in_background(caplog: Any) -> None:
